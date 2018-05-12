@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/willnx/vlab_api_common.svg?branch=master
+   :target: https://travis-ci.org/willnx/vlab_api_common
+
 ###############
 vlab_api_common
 ###############
