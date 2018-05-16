@@ -122,7 +122,7 @@ def get_token_from_header():
                       leeway=10) # 10 Seconds fuzzy window for clock skewing
 
 
-def generate_test_token(username='pat', memberOf=None, roles=None, version=1, expires_at=9999999999999, issued_at=0):
+def generate_test_token(username='pat', memberOf=None, version=1, expires_at=9999999999999, issued_at=0):
     """Creates a test token that works with the `requires` and `deny` decorators
     for unit testing.
 
@@ -131,9 +131,6 @@ def generate_test_token(username='pat', memberOf=None, roles=None, version=1, ex
 
     :param memberOf: The group your test subject belongs to.
     :type memberOf: List
-
-    :param roles: A role that your test subject has.
-    :type roles: List
 
     :param version: The version of the token to generate
     :type version: Integer
@@ -146,8 +143,6 @@ def generate_test_token(username='pat', memberOf=None, roles=None, version=1, ex
     """
     if memberOf is None:
         memberOf = ['some-group']
-    if roles is None:
-        roles = ['MegaRole']
 
     claims = {'exp' : expires_at,
               'iat' : issued_at,
@@ -155,6 +150,5 @@ def generate_test_token(username='pat', memberOf=None, roles=None, version=1, ex
               'username' : username,
               'version' : version,
               'memberOf' : memberOf,
-              'roles' : roles
              }
     return encode(claims, const.AUTH_TOKEN_PUB_KEY, algorithm=const.AUTH_TOKEN_ALGORITHM)
