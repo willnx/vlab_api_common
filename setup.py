@@ -7,9 +7,9 @@ from setuptools import setup, find_packages
 
 
 setup(name="vlab-api-common",
-      author="Nicholas Willhite",
+      author="Kevin Broadwater, Nicholas Willhite",
       author_email="willnx84@gmail.com",
-      version='2018.05.11',
+      version='2018.05.22',
       packages=find_packages(),
       include_package_data=True,
       classifiers=[
@@ -20,7 +20,7 @@ setup(name="vlab-api-common",
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3.5',
       ],
-      description="Common logic used by all our RESTful API services of vLab",
+      description="Common logic used by all the RESTful API services of vLab",
       install_requires=['flask-classy', 'requests', 'pyjwt', 'ujson', 'jsonschema',
                         'cryptography', 'pyVmomi']
       )
