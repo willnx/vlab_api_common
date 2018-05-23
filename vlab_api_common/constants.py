@@ -8,7 +8,7 @@ from os import environ, path
 from collections import namedtuple, OrderedDict
 
 import requests
-VLAB_URL = environ.get('VLAB_URL', 'https://vlab.igs.corp')
+VLAB_URL = environ.get('VLAB_URL', 'https://localhost')
 
 
 def get_public_key():

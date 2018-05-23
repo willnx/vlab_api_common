@@ -28,12 +28,17 @@ class vCenter(object):
 
     :param port: The port to use when connecting to the vCenter server. Default is 443
     :type port: Integer
+
+    :param verify: Set to False if you're using a self-signed TLS cert for vCenter
+    :type verify: Boolean
     """
 
-    def __init__(self, host, user, password, port=443):
-        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-        context.verify_mode = ssl.CERT_NONE
-
+    def __init__(self, host, user, password, port=443, verify=True):
+        if verify is False:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+            context.verify_mode = ssl.CERT_NONE
+        else:
+            context = ssl._create_default_https_context
         self.conn = connect.SmartConnect(host=host, user=user, pwd=password,
                                          port=port, sslContext=context)
 

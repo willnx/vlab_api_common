@@ -5,7 +5,7 @@ Suite(s) of test for the http_auth.py module
 import os
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import jwt
 import ujson
@@ -31,8 +31,7 @@ class TestAclInToken1(unittest.TestCase):
         # make one in your specific test case
         self.token = {'version' : 1,
                       'username': 'bob',
-                      'memberOf' : ['some-group', 'other-group'],
-                      'roles' : ['MegaRole', 'AwesomeRole']}
+                      'memberOf' : ['some-group', 'other-group']}
 
     def test_defaults_false(self):
         """When no parameters are set, `acl_in_token` returns False."""
@@ -118,31 +117,6 @@ class TestAclInToken1(unittest.TestCase):
         output = http_auth.acl_in_token(self.token, memberOf=['a-group-never-heard-of', 'some-other-crazy-group'])
         self.assertFalse(output)
 
-    def test_roles(self):
-        """When the roles param equals the token memberOf, `acl_in_token` returns True."""
-        output = http_auth.acl_in_token(self.token, roles='MegaRole')
-        self.assertTrue(output)
-
-    def test_roles_array(self):
-        """When the roles param is a List and the token contains an element
-        within that list, `acl_in_token` returns True."""
-        output = http_auth.acl_in_token(self.token, roles=['MegaRole', 'CatRole'])
-        self.assertTrue(output)
-
-    def test_roles_false(self):
-        """When the roles param value is a string, and that value DOESN'T
-        exist within the roles token array, `acl_in_token` return False.
-        """
-        output = http_auth.acl_in_token(self.token, roles='CatRole')
-        self.assertFalse(output)
-
-    def test_roles_array_false(self):
-        """When the roles param value is a List, and NONE of those values
-        exist within the roles token array, `acl_in_token` returns False.
-        """
-        output = http_auth.acl_in_token(self.token, roles=['CatRole', 'MicroPigRole'])
-        self.assertFalse(output)
-
 
 class TestGetTokenFromHeader(unittest.TestCase):
     """A suite of test cases for the ``get_token_from_header`` function"""
@@ -156,8 +130,7 @@ class TestGetTokenFromHeader(unittest.TestCase):
         token = jwt.encode(claims,
                            http_auth.const.AUTH_TOKEN_PUB_KEY,
                            algorithm=http_auth.const.AUTH_TOKEN_ALGORITHM)
-        header_format = b'Bearer ' + token
-        fake_request.headers.get.return_value = header_format
+        fake_request.headers.get.return_value = token
 
         output = http_auth.get_token_from_header()
 
@@ -174,8 +147,7 @@ class TestGetTokenFromHeader(unittest.TestCase):
         token = jwt.encode(claims,
                            http_auth.const.AUTH_TOKEN_PUB_KEY,
                            algorithm=http_auth.const.AUTH_TOKEN_ALGORITHM)
-        header_format = b'Bearer ' + token
-        fake_request.headers.get.return_value = header_format
+        fake_request.headers.get.return_value = token
 
         self.assertRaises(jwt.ExpiredSignatureError, http_auth.get_token_from_header)
 
@@ -184,7 +156,7 @@ class TestGetTokenFromHeader(unittest.TestCase):
         """The function `get_token_from_header` raises ExpiredSignatureError
         when no token is supplied in the HTTP header.
         """
-        fake_request.headers.get.return_value = None
+        fake_request.headers.get.side_effect = [AttributeError('testing')]
 
         self.assertRaises(jwt.ExpiredSignatureError, http_auth.get_token_from_header)
 
@@ -196,11 +168,11 @@ class TestDecorators(unittest.TestCase):
         """Runs before every test case"""
         self.token = {'username' : 'bob-the-builder',
                       'version' : 1,
-                      'memberOf' : ['some-group'],
-                      'roles' : ['MegaRole']}
+                      'memberOf' : ['some-group']}
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_requires(self, fake_get_token_from_header):
+    def test_requires(self, fake_get_token_from_header, fake_requests):
         """The `requires` decorator works for the most basic use case"""
         fake_get_token_from_header.return_value = self.token
 
@@ -211,8 +183,9 @@ class TestDecorators(unittest.TestCase):
         output = fake_func()
         self.assertTrue(output)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_requires_expired_token(self, fake_get_token_from_header):
+    def test_requires_expired_token(self, fake_get_token_from_header, fake_requests):
         """The `requires` bails early if the token is already expired"""
         fake_get_token_from_header.side_effect = jwt.ExpiredSignatureError('TESTING')
 
@@ -227,8 +200,9 @@ class TestDecorators(unittest.TestCase):
 
         self.assertEqual(output, expected)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_requires_authorization_link(self, fake_get_token_from_header):
+    def test_requires_authorization_link(self, fake_get_token_from_header, fake_requests):
         """The `requires` decorator auto sets the Link header for Unauthorized"""
         fake_get_token_from_header.side_effect = jwt.ExpiredSignatureError('TESTING')
 
@@ -239,12 +213,13 @@ class TestDecorators(unittest.TestCase):
         resp = fake_func()
 
         found = resp.headers['Link']
-        expected = '<https://vlab.igs.corp/api/1/auth>; rel=authorization'
+        expected = '<https://localhost/api/1/auth>; rel=authorization'
 
         self.assertEqual(found, expected)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_requires_no_access(self, fake_get_token_from_header):
+    def test_requires_no_access(self, fake_get_token_from_header, fake_requests):
         """The `requires` bails early if the user doesn't meet the ACL requirement"""
         self.token['version'] = 9001
         fake_get_token_from_header.return_value = self.token
@@ -259,9 +234,9 @@ class TestDecorators(unittest.TestCase):
 
         self.assertEqual(output, expected)
 
-
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_requires_layered(self, fake_get_token_from_header):
+    def test_requires_layered(self, fake_get_token_from_header, fake_requests):
         """The `requires` decorator only pulls the token once if used multiple times"""
         fake_get_token_from_header.return_value = self.token
 
@@ -275,12 +250,13 @@ class TestDecorators(unittest.TestCase):
 
         self.assertEqual(fake_get_token_from_header.call_count, 1)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_requires_complex(self, fake_get_token_from_header):
+    def test_requires_complex(self, fake_get_token_from_header, fake_requests):
         """The `requires` decorator works for more complex ACLs"""
         fake_get_token_from_header.return_value = self.token
 
-        @http_auth.requires(roles=['MegaRole', 'LessMegaRole'])
+        @http_auth.requires(username=['bob', 'sarah'])
         @http_auth.requires(memberOf=['some-group', 'another-group'])
         def fake_func(*args, **kwargs):
             return True
@@ -290,8 +266,45 @@ class TestDecorators(unittest.TestCase):
 
         self.assertEqual(output, expected)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_deny_basic(self, fake_get_token_from_header):
+    def test_requires_verify_once(self, fake_get_token_from_header, fake_requests):
+        """The `requires` decorator only verifies the token once with more comples ACLs"""
+        fake_get_token_from_header.return_value = self.token
+
+        @http_auth.requires(username=['andy', 'sarah'])
+        @http_auth.requires(memberOf=['some-group', 'another-group'])
+        def fake_func(*args, **kwargs):
+            return True
+
+        fake_func()
+
+        self.assertEqual(fake_requests.get.call_count, 1)
+
+    @patch.object(http_auth, 'requests')
+    @patch.object(http_auth, 'get_token_from_header')
+    def test_requires_verify_fail(self, fake_get_token_from_header, fake_requests):
+        """The `requires` decorator returns the status and content when verification fails"""
+        fake_get_token_from_header.return_value = self.token
+        fake_resp = MagicMock()
+        fake_resp.ok = False
+        fake_resp.content = 'testing'
+        fake_resp.status = 401
+        fake_requests.get.return_value = fake_resp
+
+        @http_auth.requires(username=['andy', 'sarah'])
+        @http_auth.requires(memberOf=['some-group', 'another-group'])
+        def fake_func(*args, **kwargs):
+            return True
+
+        output = fake_func()
+        expected = ('testing', 401)
+
+        self.assertEqual(output, expected)
+
+    @patch.object(http_auth, 'requests')
+    @patch.object(http_auth, 'get_token_from_header')
+    def test_deny_basic(self, fake_get_token_from_header, fake_requests):
         """The `deny` decorator only denies access based on the ACL"""
         # the token is defined to be "bob-the-builder", not "some-jerk"
         fake_get_token_from_header.return_value = self.token
@@ -305,8 +318,9 @@ class TestDecorators(unittest.TestCase):
 
         self.assertEqual(output, expected)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_deny_no_access(self, fake_get_token_from_header):
+    def test_deny_no_access(self, fake_get_token_from_header, fake_requests):
         """The `deny` decorator can block access based on identity"""
         fake_get_token_from_header.return_value = self.token
 
@@ -321,8 +335,9 @@ class TestDecorators(unittest.TestCase):
 
         self.assertEqual(output, expected)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_deny_expired_token(self, fake_get_token_from_header):
+    def test_deny_expired_token(self, fake_get_token_from_header, fake_requests):
         """The `deny` bails early if the token is already expired"""
         fake_get_token_from_header.side_effect = jwt.ExpiredSignatureError('TESTING')
 
@@ -337,8 +352,9 @@ class TestDecorators(unittest.TestCase):
 
         self.assertEqual(output, expected)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_deny_authorization_link(self, fake_get_token_from_header):
+    def test_deny_authorization_link(self, fake_get_token_from_header, fake_requests):
         """The `deny` decorator auto sets the Link header for Unauthorized"""
         fake_get_token_from_header.side_effect = jwt.ExpiredSignatureError('TESTING')
 
@@ -349,12 +365,13 @@ class TestDecorators(unittest.TestCase):
         resp = fake_func()
 
         found = resp.headers['Link']
-        expected = '<https://vlab.igs.corp/api/1/auth>; rel=authorization'
+        expected = '<https://localhost/api/1/auth>; rel=authorization'
 
         self.assertEqual(found, expected)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_deny_layered(self, fake_get_token_from_header):
+    def test_deny_layered(self, fake_get_token_from_header, fake_requests):
         """The `deny` decorator only pulls the token once if used multiple times"""
         fake_get_token_from_header.return_value = self.token
 
@@ -368,12 +385,13 @@ class TestDecorators(unittest.TestCase):
 
         self.assertEqual(fake_get_token_from_header.call_count, 1)
 
+    @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
-    def test_deny_complex(self, fake_get_token_from_header):
+    def test_deny_complex(self, fake_get_token_from_header, fake_requests):
         """The `deny` decorator works for more complex ACLs"""
         fake_get_token_from_header.return_value = self.token
 
-        @http_auth.deny(roles=['MegaRole', 'LessMegaRole'])
+        @http_auth.deny(username=['andy', 'sarah'])
         @http_auth.deny(memberOf=['some-group', 'another-group'])
         def fake_func(*args, **kwargs):
             return True
@@ -382,6 +400,42 @@ class TestDecorators(unittest.TestCase):
 
         output = (ujson.loads(json_output), http_status_code)
         expected = ({'error': 'user bob-the-builder does not have access'}, 403)
+
+        self.assertEqual(output, expected)
+
+    @patch.object(http_auth, 'requests')
+    @patch.object(http_auth, 'get_token_from_header')
+    def test_deny_verify_once(self, fake_get_token_from_header, fake_requests):
+        """The `deny` decorator only verifies the token once with more comples ACLs"""
+        fake_get_token_from_header.return_value = self.token
+
+        @http_auth.deny(username=['andy', 'sarah'])
+        @http_auth.deny(memberOf=['some-group', 'another-group'])
+        def fake_func(*args, **kwargs):
+            return True
+
+        fake_func()
+
+        self.assertEqual(fake_requests.get.call_count, 1)
+
+    @patch.object(http_auth, 'requests')
+    @patch.object(http_auth, 'get_token_from_header')
+    def test_deny_verify_fail(self, fake_get_token_from_header, fake_requests):
+        """The `deny` decorator returns the status and content when verification fails"""
+        fake_get_token_from_header.return_value = self.token
+        fake_resp = MagicMock()
+        fake_resp.ok = False
+        fake_resp.content = 'testing'
+        fake_resp.status = 401
+        fake_requests.get.return_value = fake_resp
+
+        @http_auth.deny(username=['andy', 'sarah'])
+        @http_auth.deny(memberOf=['some-group', 'another-group'])
+        def fake_func(*args, **kwargs):
+            return True
+
+        output = fake_func()
+        expected = ('testing', 401)
 
         self.assertEqual(output, expected)
 
