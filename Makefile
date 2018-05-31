@@ -4,6 +4,9 @@ clean:
 	-rm -rf *.egg-info
 	-find . -name '*.pyc' -delete
 	-rm -f tests/.coverage
+	-docker rm `docker ps -a -q`
+	-docker rmi `docker images -q --filter "dangling=true"`
+	-docker network prune -f
 
 build: clean
 	python setup.py bdist_wheel --universal
