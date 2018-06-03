@@ -4,7 +4,7 @@ A group of test suites for the flask_common module
 """
 
 import unittest
-#from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 import ujson
 from flask import Flask
@@ -130,6 +130,89 @@ class TestFlaskCommon(unittest.TestCase):
         expected = 200
 
         self.assertEqual(resp.status_code, expected)
+
+
+class TestValidateInput(unittest.TestCase):
+    """A set of test cases for the ``validate_input`` decorator"""
+
+    some_schema = {"$schema": "http://json-schema.org/draft-04/schema#",
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "The name to give some thing"
+                        }
+                    },
+                    "required": [
+                        "name"
+                    ]
+                  }
+    fake_token = {'username' : 'bob'}
+
+    @patch.object(flask_common, 'request')
+    def test_no_body(self, fake_request):
+        """``validate_input`` - returns an error, and HTTP 400 when no content body supplied"""
+        fake_request.get_json.return_value = None
+
+        @fake_requires(self.fake_token)
+        @flask_common.validate_input(self.some_schema)
+        def some_func(body, token):
+            return 'woot', 200
+
+        msg, status_code = some_func()
+        error = ujson.loads(msg)['error']
+        expected_error = 'No JSON content body sent in HTTP request'
+        expected_code = 400
+
+        self.assertEqual(error, expected_error)
+        self.assertEqual(status_code, expected_code)
+
+    @patch.object(flask_common, 'logger')
+    @patch.object(flask_common, 'request')
+    def test_bad_body(self, fake_request, fake_logger):
+        """``validate_input`` - returns an error, and HTTP 400 when invalid content body supplied"""
+        fake_request.get_json.return_value = {'fail': True}
+
+        @fake_requires(self.fake_token)
+        @flask_common.validate_input(self.some_schema)
+        def some_func(body, token):
+            return 'woot', 200
+
+        msg, status_code = some_func()
+        error = ujson.loads(msg)['error'].split('.')[0]
+        expected_error = "Input does not match schema"
+        expected_code = 400
+
+        self.assertEqual(error, expected_error)
+        self.assertEqual(status_code, expected_code)
+
+    @patch.object(flask_common, 'logger')
+    @patch.object(flask_common, 'request')
+    def test_ok(self, fake_request, fake_logger):
+        """``validate_input`` - returns the decorated functions response and status when input is OK"""
+        fake_request.get_json.return_value = {'name': 'foo'}
+
+        @fake_requires(self.fake_token)
+        @flask_common.validate_input(self.some_schema)
+        def some_func(body, token):
+            return 'woot', 200
+
+        msg, status_code = some_func()
+        expected_msg = "woot"
+        expected_code = 200
+
+        self.assertEqual(msg, expected_msg)
+        self.assertEqual(status_code, expected_code)
+
+
+def fake_requires(token):
+    """"A pass-through decorator to mimic ``requires`` passing the auth token for testing"""
+    def fake_decorator(func):
+        def inner(*args, **kwargs):
+            kwargs['token'] = token
+            return func(*args, **kwargs)
+        return inner
+    return fake_decorator
 
 
 if __name__ == '__main__':

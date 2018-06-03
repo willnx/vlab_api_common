@@ -9,6 +9,7 @@ from datetime import datetime
 
 import ujson
 from flask_classy import FlaskView, request
+from jsonschema import validate, ValidationError
 
 from .std_logger import get_logger
 from .constants import const
@@ -153,5 +154,39 @@ def describe(**schemas):
                 return ujson.dumps({'content':the_schema}), 200, {'Content-Type': 'application/json'}
             else:
                 return func(*args, **kwargs)
+        return inner
+    return real_decorator
+
+
+def validate_input(schema):
+    """Ensure that the supplied HTTP content body aligns with a given JSON schema
+
+    This decorator assumes that the ``requires` or ``deny`` decorator has been
+    used before this one. This enables proper logging of "who's sending crap data".
+
+    Also, this decorator will pass the content-body to the decorated function via
+    the keyword ``body``.
+
+    :param scheam: The JSON schema the content-body must conform to
+    :type scheam: Dictionary
+    """
+    def real_decorator(func):
+        @wraps(func)
+        def inner(*args, **kwargs):
+            resp = {'user' : kwargs['token']['username']}
+            body = request.get_json()
+            if body is None:
+                resp['error'] = 'No JSON content body sent in HTTP request'
+                return ujson.dumps(resp), 400
+            else:
+                try:
+                    validate(body, schema)
+                except ValidationError as doh:
+                    logger.error(doh)
+                    resp['error'] = 'Input does not match schema.\nInput: {}\nSchema: {}'.format(body, schema)
+                    return ujson.dumps(resp), 400
+                else:
+                    kwargs['body'] = body
+            return func(*args, **kwargs)
         return inner
     return real_decorator
