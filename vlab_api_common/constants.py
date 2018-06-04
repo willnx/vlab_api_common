@@ -4,7 +4,8 @@ This module contains run time variables that do not change during run time. The
 idea is to only ever build one source of truth (be it a binary, or package), and
 execute that same built thing regardless of the runtime environment.
 """
-from os import environ, path
+from os import environ
+from urllib.parse import urljoin
 from collections import namedtuple, OrderedDict
 
 import requests
@@ -28,7 +29,7 @@ def get_public_key():
     a new concept to the testing framework.
     """
     if environ.get('PRODUCTION', False) == 'true':
-        resp = requests.get(path.join(VLAB_URL,'/api/1/auth/key'))
+        resp = requests.get(urljoin(VLAB_URL,'/api/1/auth/key'))
         resp.raise_for_status()
         data = resp.json()
         return data['content']['key']
