@@ -123,10 +123,8 @@ def get_token_from_header():
 
     :Raises: ExpiredSignatureError
     """
-    try:
-        serialized_token = request.headers.get('X-Auth')
-    except AttributeError:
-        # no token in header
+    serialized_token = request.headers.get('X-Auth', default=None)
+    if serialized_token is None:
         raise ExpiredSignatureError('No auth token in HTTP header')
     else:
         return decode(serialized_token,

@@ -141,22 +141,7 @@ class TestGetTokenFromHeader(unittest.TestCase):
         """The function `get_token_from_header` raises ExpiredSignatureError
         when the token is expired.
         """
-        claims = {'exp' : time.time() - 10000,
-                  'iss' : http_auth.const.AUTH_TOKEN_ISSUER
-                 }
-        token = jwt.encode(claims,
-                           http_auth.const.AUTH_TOKEN_PUB_KEY,
-                           algorithm=http_auth.const.AUTH_TOKEN_ALGORITHM)
-        fake_request.headers.get.return_value = token
-
-        self.assertRaises(jwt.ExpiredSignatureError, http_auth.get_token_from_header)
-
-    @patch.object(http_auth, 'request')
-    def test_get_token_from_header_doh(self, fake_request):
-        """The function `get_token_from_header` raises ExpiredSignatureError
-        when no token is supplied in the HTTP header.
-        """
-        fake_request.headers.get.side_effect = [AttributeError('testing')]
+        fake_request.headers.get.return_value = None
 
         self.assertRaises(jwt.ExpiredSignatureError, http_auth.get_token_from_header)
 
