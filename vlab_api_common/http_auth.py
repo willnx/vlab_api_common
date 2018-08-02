@@ -40,7 +40,7 @@ def requires(username=None, memberOf=None, version=const.AUTH_TOKEN_VERSION, ver
                     return resp
 
             if verify is True and kwargs.get('verified', False) is False:
-                resp = requests.get('{}{}'.format(const.VLAB_URL, '/api/1/auth'), params={'token': kwargs['token']})
+                resp = requests.get('{}{}'.format(const.VLAB_URL, '/api/1/auth'), headers={'X-Auth': kwargs['token']})
                 if not resp.ok:
                     return resp.content, resp.status
                 else:
@@ -76,7 +76,7 @@ def deny(username=None, memberOf=None, version=None, verify=True):
                     return resp
 
             if verify is True and kwargs.get('verified', False) is False:
-                resp = requests.get('{}{}'.format(const.VLAB_URL, '/api/1/auth'), params={'token': kwargs['token']})
+                resp = requests.get('{}{}'.format(const.VLAB_URL, '/api/1/auth'), headers={'X-Auth': kwargs['token']})
                 if not resp.ok:
                     return resp.content, resp.status
                 else:
