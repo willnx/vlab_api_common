@@ -19,7 +19,7 @@ class TestConstants(unittest.TestCase):
     @patch.object(constants.requests, 'get')
     def test_get_public_key_production(self, fake_get):
         """When in production, `get_public_key` does an API call to obtain the
-        RSA key needed for validation Maestro Auth Tokens.
+        RSA key needed for validation vLab Auth Tokens.
         """
         os.environ['PRODUCTION'] = 'true'
         fake_resp = MagicMock()
@@ -30,6 +30,24 @@ class TestConstants(unittest.TestCase):
         expected = 'PUBLIC KEY'
 
         self.assertEqual(output, expected)
+
+    @patch.object(constants.requests, 'get')
+    def test_get_public_key_beta(self, fake_get):
+        """When running a beta server, `get_public_key` does an API call to obtain the
+        RSA key needed for validation vLab Auth Tokens, but accept a self-signed TLS cert.
+        """
+        os.environ['PRODUCTION'] = 'beta'
+        fake_resp = MagicMock()
+        fake_resp.json.return_value = {'content' : {'key' : "PUBLIC KEY"}}
+        fake_get.return_value = fake_resp
+
+        output = constants.get_public_key()
+        expected = 'PUBLIC KEY'
+        _, verify_arg = fake_get.call_args
+
+        self.assertEqual(output, expected)
+        self.assertFalse(verify_arg['verify'])
+
 
     @patch.object(constants.requests, 'get')
     def test_get_public_key_exception(self, fake_get):

@@ -125,7 +125,8 @@ class TestGetTokenFromHeader(unittest.TestCase):
     def test_get_token_from_header(self, fake_request):
         """The function `get_token_from_header` works as expected"""
         claims = {'exp' : time.time() + 10000,
-                  'iss' : http_auth.const.AUTH_TOKEN_ISSUER
+                  'iss' : http_auth.const.AUTH_TOKEN_ISSUER,
+                  'version' : 1,
                  }
         token = jwt.encode(claims,
                            http_auth.const.AUTH_TOKEN_PUB_KEY,
@@ -137,13 +138,65 @@ class TestGetTokenFromHeader(unittest.TestCase):
         self.assertEqual(output, claims)
 
     @patch.object(http_auth, 'request')
-    def test_get_token_from_header_raises(self, fake_request):
-        """The function `get_token_from_header` raises ExpiredSignatureError
-        when the token is expired.
-        """
+    def test_get_token_from_header_no_token(self, fake_request):
+        """The function `get_token_from_header` raises ValueError when no token is supplied."""
         fake_request.headers.get.return_value = None
 
-        self.assertRaises(jwt.ExpiredSignatureError, http_auth.get_token_from_header)
+        self.assertRaises(ValueError, http_auth.get_token_from_header)
+
+    @patch.object(http_auth, 'request')
+    def test_get_v2_token_from_header_ok(self, fake_request):
+        """The function `get_token_from_header` validates client_ip when using v2 tokens"""
+        claims = {'exp' : time.time() + 10000,
+                  'iss' : http_auth.const.AUTH_TOKEN_ISSUER,
+                  'version' : 2,
+                  'client_ip' : '127.0.0.1',
+                 }
+        token = jwt.encode(claims,
+                           http_auth.const.AUTH_TOKEN_PUB_KEY,
+                           algorithm=http_auth.const.AUTH_TOKEN_ALGORITHM)
+        fake_request.headers.get.return_value = token
+        fake_request.headers.getlist.return_value = ['127.0.0.1']
+
+        output = http_auth.get_token_from_header()
+
+        self.assertEqual(output, claims)
+
+    @patch.object(http_auth, 'request')
+    def test_get_v2_token_from_header_no_forward(self, fake_request):
+        """The function `get_token_from_header` validates client_ip when using v2 tokens"""
+        claims = {'exp' : time.time() + 10000,
+                  'iss' : http_auth.const.AUTH_TOKEN_ISSUER,
+                  'version' : 2,
+                  'client_ip' : '127.0.0.1',
+                 }
+        token = jwt.encode(claims,
+                           http_auth.const.AUTH_TOKEN_PUB_KEY,
+                           algorithm=http_auth.const.AUTH_TOKEN_ALGORITHM)
+        fake_request.headers.get.return_value = token
+        fake_request.headers.getlist.return_value = []
+        fake_request.remote_addr = '127.0.0.1'
+
+        output = http_auth.get_token_from_header()
+
+        self.assertEqual(output, claims)
+
+    @patch.object(http_auth, 'request')
+    def test_get_v2_token_from_header_hijacked(self, fake_request):
+        """The function `get_token_from_header` raises ValueError if the token comes form a different client ip"""
+        claims = {'exp' : time.time() + 10000,
+                  'iss' : http_auth.const.AUTH_TOKEN_ISSUER,
+                  'version' : 2,
+                  'client_ip' : '127.0.0.1',
+                 }
+        token = jwt.encode(claims,
+                           http_auth.const.AUTH_TOKEN_PUB_KEY,
+                           algorithm=http_auth.const.AUTH_TOKEN_ALGORITHM)
+        fake_request.headers.get.return_value = token
+        fake_request.headers.getlist.return_value = []
+        fake_request.remote_addr = '8.8.8.8'
+
+        self.assertRaises(ValueError, http_auth.get_token_from_header)
 
 
 class TestDecorators(unittest.TestCase):
@@ -167,6 +220,23 @@ class TestDecorators(unittest.TestCase):
 
         output = fake_func()
         self.assertTrue(output)
+
+    @patch.object(http_auth, 'requests')
+    @patch.object(http_auth, 'get_token_from_header')
+    def test_requires_invalid_token(self, fake_get_token_from_header, fake_requests):
+        """The `requires` bails early if the token is invalid or missing"""
+        fake_get_token_from_header.side_effect = ValueError('TESTING')
+
+        @http_auth.requires()
+        def fake_func(*args, **kwargs):
+            return True
+
+        resp = fake_func()
+
+        output = (ujson.loads(resp.get_data()), resp.status_code)
+        expected = ({"error":"TESTING"}, 401)
+
+        self.assertEqual(output, expected)
 
     @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
@@ -334,6 +404,23 @@ class TestDecorators(unittest.TestCase):
 
         output = (ujson.loads(resp.get_data()), resp.status_code)
         expected = ({"error":"No Valid Session Found"}, 401)
+
+        self.assertEqual(output, expected)
+
+    @patch.object(http_auth, 'requests')
+    @patch.object(http_auth, 'get_token_from_header')
+    def test_deny_invalid_token(self, fake_get_token_from_header, fake_requests):
+        """The `deny` bails early if the token is invalid/missing"""
+        fake_get_token_from_header.side_effect = ValueError('TESTING')
+
+        @http_auth.deny()
+        def fake_func(*args, **kwargs):
+            return True
+
+        resp = fake_func()
+
+        output = (ujson.loads(resp.get_data()), resp.status_code)
+        expected = ({"error":"TESTING"}, 401)
 
         self.assertEqual(output, expected)
 
