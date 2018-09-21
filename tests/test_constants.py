@@ -76,7 +76,7 @@ class TestConstants(unittest.TestCase):
         expected = 'PUBLIC KEY'
 
         self.assertEqual(key, expected)
-        fake_sleep.assert_called()
+        self.assertEqual(1, fake_sleep.call_count)
 
     @patch.object(constants.time, 'sleep')
     @patch.object(constants.requests, 'get')
