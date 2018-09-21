@@ -1,10 +1,12 @@
 # -*- coding: UTF-8 -*-
 """
-Suite(s) of test cases for the `constants.py` module
+Suite(s) of test cases for the ``constants.py`` module
 """
 import os
 import unittest
 from unittest.mock import patch, MagicMock
+
+from requests.exceptions import ConnectionError
 
 from vlab_api_common import constants
 
@@ -16,64 +18,82 @@ class TestConstants(unittest.TestCase):
         """Runs before every test case"""
         os.environ['PRODUCTION'] = ''
 
+    def test_get_encryption_data(self):
+        """Defaults to assuming a local dev/unit test enviroment - does no I/O"""
+        output = constants.get_encryption_data()
+        expected = ('testing', 'HS256', 'string')
+        self.assertEqual(output, expected)
+
     @patch.object(constants.requests, 'get')
-    def test_get_public_key_production(self, fake_get):
-        """When in production, `get_public_key` does an API call to obtain the
+    def test_get_encryption_data_production(self, fake_get):
+        """When in production, ``get_encryption_data`` does an API call to obtain the
         RSA key needed for validation vLab Auth Tokens.
         """
         os.environ['PRODUCTION'] = 'true'
         fake_resp = MagicMock()
-        fake_resp.json.return_value = {'content' : {'key' : "PUBLIC KEY"}}
+        fake_resp.json.return_value = {'content' : {'key' : "PUBLIC KEY",
+                                                    'algorithm' : 'RS512',
+                                                    'format' : "pem"}}
         fake_get.return_value = fake_resp
 
-        output = constants.get_public_key()
+        key, algorithm, format = constants.get_encryption_data()
         expected = 'PUBLIC KEY'
 
-        self.assertEqual(output, expected)
+        self.assertEqual(key, expected)
 
     @patch.object(constants.requests, 'get')
-    def test_get_public_key_beta(self, fake_get):
-        """When running a beta server, `get_public_key` does an API call to obtain the
+    def test_get_encryption_data_beta(self, fake_get):
+        """When running a beta server, ``get_encryption_data`` does an API call to obtain the
         RSA key needed for validation vLab Auth Tokens, but accept a self-signed TLS cert.
         """
         os.environ['PRODUCTION'] = 'beta'
         fake_resp = MagicMock()
-        fake_resp.json.return_value = {'content' : {'key' : "PUBLIC KEY"}}
+        fake_resp.json.return_value = {'content' : {'key' : "PUBLIC KEY",
+                                                    'algorithm' : 'RS512',
+                                                    'format' : "pem"}}
         fake_get.return_value = fake_resp
 
-        output = constants.get_public_key()
+        key, algorithm, format = constants.get_encryption_data()
         expected = 'PUBLIC KEY'
         _, verify_arg = fake_get.call_args
 
-        self.assertEqual(output, expected)
         self.assertFalse(verify_arg['verify'])
 
-
+    @patch.object(constants.time, 'sleep')
     @patch.object(constants.requests, 'get')
-    def test_get_public_key_exception(self, fake_get):
-        """When in production, `get_public_key` will raise an exception if unable
-        to obtain the public RSA key.
+    def test_get_encryption_data_retries(self, fake_get, fake_sleep):
+        """When dynamically obtaining the encryption information, the function
+        will retry upon connection error.
         """
-        os.environ['PRODUCTION'] = 'true'
-        fake_get.return_value.raise_for_status.side_effect = RuntimeError('TESTING')
+        os.environ['PRODUCTION'] = 'beta'
+        fake_resp = MagicMock()
+        fake_resp.json.return_value = {'content' : {'key' : "PUBLIC KEY",
+                                                    'algorithm' : 'RS512',
+                                                    'format' : "pem"}}
+        fake_get.side_effect = [ConnectionError('testing'), fake_resp]
 
-        self.assertRaises(RuntimeError, constants.get_public_key)
+        key, algorithm, format = constants.get_encryption_data()
+        expected = 'PUBLIC KEY'
 
-    def test_get_public_key_default(self):
-        """The function `get_public_key` assumes a testing environment by default"""
-        output = constants.get_public_key()
-        expected = "testing"
+        self.assertEqual(key, expected)
+        fake_sleep.assert_called()
 
-        self.assertEqual(output, expected)
+    @patch.object(constants.time, 'sleep')
+    @patch.object(constants.requests, 'get')
+    def test_get_encryption_data_raises(self, fake_get, fake_sleep):
+        """Raises RuntimeError if completely unable to dynamically obtain encryption
+        information.
+        """
+        os.environ['PRODUCTION'] = 'beta'
+        fake_resp = MagicMock()
+        fake_resp.json.return_value = {'content' : {'key' : "PUBLIC KEY",
+                                                    'algorithm' : 'RS512',
+                                                    'format' : "pem"}}
+        fake_get.side_effect = [ConnectionError('testing') for x in range(15)]
 
-    def test_get_public_key_evn_var(self):
-        """Setting the env var PRODUCTION to anything other than 'true' makes PRODUCTION false"""
-        os.environ['PRODUCTION'] = 'TRUE' # must be all lower case
-        output = constants.get_public_key()
-        expected = 'testing'
-        os.environ.pop('PRODUCTION', None)
+        with self.assertRaises(RuntimeError):
+            constants.get_encryption_data()
 
-        self.assertEqual(output, expected)
 
 
 if __name__ == '__main__':
