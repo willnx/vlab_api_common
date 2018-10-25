@@ -522,6 +522,12 @@ class TestGenerateTestToken(unittest.TestCase):
 
         self.assertTrue(isinstance(token, bytes))
 
+    def test_v2_token(self):
+        """Verifies that ``generate_v2_test_token`` returns an expected token"""
+        token = http_auth.generate_v2_test_token()
+
+        self.assertTrue(isinstance(token, bytes))
+
 
 if __name__ == '__main__':
     unittest.main()
