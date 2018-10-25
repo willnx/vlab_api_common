@@ -181,3 +181,32 @@ def generate_test_token(username='pat', memberOf=None, version=1, expires_at=999
               'memberOf' : memberOf,
              }
     return encode(claims, const.AUTH_TOKEN_PUB_KEY, algorithm=const.AUTH_TOKEN_ALGORITHM)
+
+
+def generate_v2_test_token(username='pat', version=2, expires_at=9999999999999, issued_at=0, client_ip='127.0.0.1'):
+    """Creates a version 2 test token that works with the `requires` and `deny` decorators
+    for unit testing.
+
+    :param username: The username of your test subject
+    :type username: String
+
+    :param client_ip: The IP of the machine that was issued a token
+    :type client_ip: String
+
+    :param version: The version of the token to generate
+    :type version: Integer
+
+    :param expires_at: The EPOC timestamp when the token expires
+    :type expires_at: Integer/Float
+
+    :param issued_at: The EPOC timestamp when the token was created
+    :type issued_at: Integer/Float
+    """
+    claims = {'exp' : expires_at,
+              'iat' : issued_at,
+              'iss' : const.AUTH_TOKEN_ISSUER,
+              'username' : username,
+              'version' : version,
+              'client_ip' : client_ip,
+             }
+    return encode(claims, const.AUTH_TOKEN_PUB_KEY, algorithm=const.AUTH_TOKEN_ALGORITHM)

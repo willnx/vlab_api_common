@@ -87,13 +87,13 @@ class BaseView(FlaskView):
 
         user = data.pop('user', 'unset')
         if not ('poll' in request.full_path and response.status_code == 206):
-            #127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326  "http://www.example.com/start.html" "Mozilla/4.08 [en] (Win98; I ;Nav)"
+            #127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326  "http://www.example.com/start.html" "Mozilla/4.08 [en] (Win98; I ;Nav) rid=aabbcc"
             r_time = datetime.strftime(datetime.utcnow(), "%d/%b/%Y:%H:%M:%S -0000")
             try:
                 client_ip = request.headers.getlist("X-Forwarded-For")[0]
             except IndexError:
                 client_ip = request.remote_addr
-            logger.info('{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(client_ip,
+            logger.info('{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9} rid={10}"'.format(client_ip,
                                                                                    user,
                                                                                    r_time,
                                                                                    request.method,
@@ -102,7 +102,8 @@ class BaseView(FlaskView):
                                                                                    response.status_code,
                                                                                    response.content_length,
                                                                                    request.referrer,
-                                                                                   request.user_agent.string))
+                                                                                   request.user_agent.string,
+                                                                                   request.headers.get('X-REQUEST-ID', None)))
         base.update(data)
         response.set_data(ujson.dumps(base))
         response.headers['Content-Type'] = 'application/json'
