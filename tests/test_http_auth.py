@@ -257,6 +257,23 @@ class TestDecorators(unittest.TestCase):
 
     @patch.object(http_auth, 'requests')
     @patch.object(http_auth, 'get_token_from_header')
+    def test_requires_token_error(self, fake_get_token_from_header, fake_requests):
+        """The `requires` returns an unauthorized error if the token decryption fails"""
+        fake_get_token_from_header.side_effect = jwt.exceptions.InvalidTokenError('TESTING')
+
+        @http_auth.requires()
+        def fake_func(*args, **kwargs):
+            return True
+
+        resp = fake_func()
+
+        output = (ujson.loads(resp.get_data()), resp.status_code)
+        expected = ({"error":"Invalid auth token supplied"}, 401)
+
+        self.assertEqual(output, expected)
+
+    @patch.object(http_auth, 'requests')
+    @patch.object(http_auth, 'get_token_from_header')
     def test_requires_authorization_link(self, fake_get_token_from_header, fake_requests):
         """The `requires` decorator auto sets the Link header for Unauthorized"""
         fake_get_token_from_header.side_effect = jwt.ExpiredSignatureError('TESTING')
@@ -404,6 +421,23 @@ class TestDecorators(unittest.TestCase):
 
         output = (ujson.loads(resp.get_data()), resp.status_code)
         expected = ({"error":"No Valid Session Found"}, 401)
+
+        self.assertEqual(output, expected)
+
+    @patch.object(http_auth, 'requests')
+    @patch.object(http_auth, 'get_token_from_header')
+    def test_deny_token_error(self, fake_get_token_from_header, fake_requests):
+        """The `deny` returns an unauthorized error if the token decryption fails"""
+        fake_get_token_from_header.side_effect = jwt.exceptions.InvalidTokenError('TESTING')
+
+        @http_auth.deny()
+        def fake_func(*args, **kwargs):
+            return True
+
+        resp = fake_func()
+
+        output = (ujson.loads(resp.get_data()), resp.status_code)
+        expected = ({"error":"Invalid auth token supplied"}, 401)
 
         self.assertEqual(output, expected)
 

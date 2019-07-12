@@ -14,7 +14,7 @@ from functools import wraps
 import ujson
 import requests
 from flask_classy import request, Response
-from jwt import ExpiredSignatureError, decode, encode
+from jwt import InvalidTokenError, ExpiredSignatureError, decode, encode
 
 from vlab_api_common.constants import const
 
@@ -35,6 +35,8 @@ def requires(username=None, memberOf=None, version=const.AUTH_TOKEN_VERSION, ver
                     kwargs['token'] = fresh_token
                 except ExpiredSignatureError:
                     error = 'No Valid Session Found'
+                except InvalidTokenError:
+                    error = 'Invalid auth token supplied'
                 except ValueError as doh:
                     error = '{}'.format(doh)
             if error:
@@ -75,6 +77,8 @@ def deny(username=None, memberOf=None, version=None, verify=True):
                     kwargs['token'] = fresh_token
                 except ExpiredSignatureError:
                     error = 'No Valid Session Found'
+                except InvalidTokenError:
+                    error = 'Invalid auth token supplied'
                 except ValueError as doh:
                     error = '{}'.format(doh)
             if error:
