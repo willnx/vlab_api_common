@@ -83,7 +83,7 @@ class TestFlaskCommon(unittest.TestCase):
 
         data = ujson.loads(resp.data)
         params = data['params']
-        expected = {'myparam' : ['true']}
+        expected = {'myparam' : 'true'}
 
         self.assertEqual(params, expected)
 
