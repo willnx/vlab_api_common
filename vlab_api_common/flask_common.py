@@ -9,7 +9,7 @@ from datetime import datetime
 
 import ujson
 from flask_classy import FlaskView, request
-from jsonschema import validate, ValidationError
+from jsonschema import validate, ValidationError, draft4_format_checker
 
 from .std_logger import get_logger
 from .constants import const
@@ -181,7 +181,7 @@ def validate_input(schema):
                 return ujson.dumps(resp), 400
             else:
                 try:
-                    validate(body, schema)
+                    validate(instance=body, schema=schema, format_checker=draft4_format_checker)
                 except ValidationError as doh:
                     logger.error(doh)
                     resp['error'] = 'Input does not match schema.\nInput: {}\nSchema: {}'.format(body, schema)
