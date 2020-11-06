@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 setup(name="vlab-api-common",
       author="Kevin Broadwater, Nicholas Willhite",
       author_email="willnx84@gmail.com",
-      version='2020.11.04',
+      version='2020.11.06',
       packages=find_packages(),
       include_package_data=True,
       classifiers=[

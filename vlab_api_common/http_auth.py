@@ -212,5 +212,6 @@ def generate_v2_test_token(username='pat', version=2, expires_at=9999999999999, 
               'username' : username,
               'version' : version,
               'client_ip' : client_ip,
+              'email' : "{}@vlab.local".format(username)
              }
     return encode(claims, const.AUTH_TOKEN_PUB_KEY, algorithm=const.AUTH_TOKEN_ALGORITHM)
