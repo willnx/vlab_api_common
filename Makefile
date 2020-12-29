@@ -15,7 +15,7 @@ install: uninstall build
 	pip install -U dist/*.whl
 
 uninstall:
-	-python uninstall -y vlab-api-common
+	-pip uninstall -y vlab-api-common
 
 test: uninstall install
 	cd tests && nosetests -v --with-coverage --cover-package=vlab_api_common
