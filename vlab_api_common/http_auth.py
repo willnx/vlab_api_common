@@ -159,6 +159,8 @@ def generate_test_token(username='pat', memberOf=None, version=1, expires_at=999
     """Creates a test token that works with the `requires` and `deny` decorators
     for unit testing.
 
+    :Returns: Bytes
+
     :param username: The username of your test subject, muhahahaha!
     :type username: String
 
@@ -184,12 +186,14 @@ def generate_test_token(username='pat', memberOf=None, version=1, expires_at=999
               'version' : version,
               'memberOf' : memberOf,
              }
-    return encode(claims, const.AUTH_TOKEN_PUB_KEY, algorithm=const.AUTH_TOKEN_ALGORITHM)
+    return encode(claims, const.AUTH_TOKEN_PUB_KEY, algorithm=const.AUTH_TOKEN_ALGORITHM).encode()
 
 
 def generate_v2_test_token(username='pat', version=2, expires_at=9999999999999, issued_at=0, client_ip='127.0.0.1'):
     """Creates a version 2 test token that works with the `requires` and `deny` decorators
     for unit testing.
+
+    :Returns: Bytes
 
     :param username: The username of your test subject
     :type username: String
@@ -214,4 +218,4 @@ def generate_v2_test_token(username='pat', version=2, expires_at=9999999999999, 
               'client_ip' : client_ip,
               'email' : "{}@vlab.local".format(username)
              }
-    return encode(claims, const.AUTH_TOKEN_PUB_KEY, algorithm=const.AUTH_TOKEN_ALGORITHM)
+    return encode(claims, const.AUTH_TOKEN_PUB_KEY, algorithm=const.AUTH_TOKEN_ALGORITHM).encode()
