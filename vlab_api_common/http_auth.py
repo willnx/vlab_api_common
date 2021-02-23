@@ -10,6 +10,7 @@ times as desired for a single API end point.
 """
 import copy
 from functools import wraps
+from collections.abc import Iterable
 
 import ujson
 import requests
@@ -57,48 +58,6 @@ def requires(username=None, memberOf=None, version=const.AUTH_TOKEN_VERSION, ver
             else:
                 resp = {'error' : 'user {} does not have access'.format(kwargs['token']['username'])}
                 return ujson.dumps(resp), 403
-        return inner
-    return real_decorator
-
-
-def deny(username=None, memberOf=None, version=None, verify=True):
-    """A decorator for forbidding access to an API because a user contains some
-    specific identity information
-
-    :Returns: Function
-    """
-    def real_decorator(func):
-        @wraps(func)
-        def inner(*args, **kwargs):
-            error = None
-            if kwargs.get('token', None) is None:
-                try:
-                    fresh_token = get_token_from_header()
-                    kwargs['token'] = fresh_token
-                except ExpiredSignatureError:
-                    error = 'No Valid Session Found'
-                except InvalidTokenError:
-                    error = 'Invalid auth token supplied'
-                except ValueError as doh:
-                    error = '{}'.format(doh)
-            if error:
-                resp = Response(ujson.dumps({'error' : error}))
-                resp.headers.add('Link', '<{0}{1}>; rel=authorization'.format(const.VLAB_URL, '/api/1/auth'))
-                resp.status_code = 401
-                return resp
-
-            if verify is True and kwargs.get('verified', False) is False:
-                resp = requests.get('{}{}'.format(const.VLAB_URL, '/api/1/auth'), headers={'X-Auth': kwargs['token']})
-                if not resp.ok:
-                    return resp.content, resp.status
-                else:
-                    kwargs['verified'] = True
-
-            if acl_in_token(kwargs['token'], username=username, memberOf=memberOf, version=version):
-                resp = {'error' : 'user {} does not have access'.format(kwargs['token']['username'])}
-                return ujson.dumps(resp), 403
-            else:
-                return func(*args, **kwargs)
         return inner
     return real_decorator
 

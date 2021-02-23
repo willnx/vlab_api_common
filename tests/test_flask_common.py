@@ -11,6 +11,8 @@ from flask import Flask
 from jsonschema import Draft4Validator, ValidationError, validate
 
 from vlab_api_common import flask_common
+from vlab_api_common.http_auth import generate_v2_test_token, requires
+
 
 GET_SCHEMA = { "$schema": "http://json-schema.org/draft-04/schema#",
                 "type": "object",
@@ -34,6 +36,7 @@ DESCRIBE_METHOD_SCHEMA = { "$schema": "http://json-schema.org/draft-04/schema#",
                          }
 
 
+
 class MyView(flask_common.BaseView):
     """Because BaseView requires subclassing to work"""
     route_base = '/test'
@@ -46,6 +49,55 @@ class MyView(flask_common.BaseView):
     def post(self):
         """The POST docstring"""
         return '<not>json</not>'
+
+
+class SchemaView(flask_common.BaseView):
+    """So we can test ``validate_input``"""
+    route_base = '/schema'
+
+    PUT = { "$schema": "http://json-schema.org/draft-04/schema#",
+            "properties" : {
+                "foo" : {"type": "string"}
+            },
+            "required" : ['foo']
+          }
+
+    @requires(verify=False, version=2)
+    @flask_common.validate_input(PUT)
+    def put(self, *args, **kwargs):
+        return 'woot', 200
+
+
+class TestValidateInput(unittest.TestCase):
+    """A suite of tests for the ``validate_input`` function"""
+    @classmethod
+    def setUp(cls):
+        """Runs before each test case"""
+        app = Flask('schema')
+        SchemaView.register(app)
+        app.config['TESTING'] = True
+        cls.app = app.test_client()
+        cls.token = generate_v2_test_token(username='bob')
+
+    def test_ok(self):
+        """``validate_input`` handles valid schemas correctly"""
+        resp = self.app.put('/schema', json={'foo' : 'yup'}, headers={'X-Auth': self.token})
+
+        self.assertEqual(resp.status_code, 200)
+
+    def test_no_body(self):
+        """``validate_intput`` returns HTTP 400 if no JSON is sent with the request"""
+        resp = self.app.put('/schema',  headers={'X-Auth': self.token})
+
+        self.assertEqual(resp.status_code, 400)
+
+    def test_bad_intput(self):
+        """``validate_intput`` returns HTTP 400 if supplied with invalid input"""
+        resp = self.app.put('/schema', json={'bar' : 'nope'}, headers={'X-Auth': self.token})
+
+        self.assertEqual(resp.status_code, 400)
+
+
 
 class TestFlaskCommon(unittest.TestCase):
     """
@@ -130,79 +182,6 @@ class TestFlaskCommon(unittest.TestCase):
         expected = 200
 
         self.assertEqual(resp.status_code, expected)
-
-
-class TestValidateInput(unittest.TestCase):
-    """A set of test cases for the ``validate_input`` decorator"""
-
-    some_schema = {"$schema": "http://json-schema.org/draft-04/schema#",
-                    "type": "object",
-                    "properties": {
-                        "name": {
-                            "type": "string",
-                            "description": "The name to give some thing"
-                        }
-                    },
-                    "required": [
-                        "name"
-                    ]
-                  }
-    fake_token = {'username' : 'bob'}
-
-    @patch.object(flask_common, 'request')
-    def test_no_body(self, fake_request):
-        """``validate_input`` - returns an error, and HTTP 400 when no content body supplied"""
-        fake_request.get_json.return_value = None
-
-        @fake_requires(self.fake_token)
-        @flask_common.validate_input(self.some_schema)
-        def some_func(body, token):
-            return 'woot', 200
-
-        msg, status_code = some_func()
-        error = ujson.loads(msg)['error']
-        expected_error = 'No JSON content body sent in HTTP request'
-        expected_code = 400
-
-        self.assertEqual(error, expected_error)
-        self.assertEqual(status_code, expected_code)
-
-    @patch.object(flask_common, 'logger')
-    @patch.object(flask_common, 'request')
-    def test_bad_body(self, fake_request, fake_logger):
-        """``validate_input`` - returns an error, and HTTP 400 when invalid content body supplied"""
-        fake_request.get_json.return_value = {'fail': True}
-
-        @fake_requires(self.fake_token)
-        @flask_common.validate_input(self.some_schema)
-        def some_func(body, token):
-            return 'woot', 200
-
-        msg, status_code = some_func()
-        error = ujson.loads(msg)['error'].split('.')[0]
-        expected_error = "Input does not match schema"
-        expected_code = 400
-
-        self.assertEqual(error, expected_error)
-        self.assertEqual(status_code, expected_code)
-
-    @patch.object(flask_common, 'logger')
-    @patch.object(flask_common, 'request')
-    def test_ok(self, fake_request, fake_logger):
-        """``validate_input`` - returns the decorated functions response and status when input is OK"""
-        fake_request.get_json.return_value = {'name': 'foo'}
-
-        @fake_requires(self.fake_token)
-        @flask_common.validate_input(self.some_schema)
-        def some_func(body, token):
-            return 'woot', 200
-
-        msg, status_code = some_func()
-        expected_msg = "woot"
-        expected_code = 200
-
-        self.assertEqual(msg, expected_msg)
-        self.assertEqual(status_code, expected_code)
 
 
 def fake_requires(token):
